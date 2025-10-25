@@ -21,29 +21,16 @@ right_drive = MotorGroup(r1, r2)
 inertial = Inertial(Ports.PORT5)
 
 # NOTE: GYRO_SCALE is used to compensate for each inertial sensor's built in error. This will be different for each sensor
-#  and must be determined experimentally before use.
+# and must be determined experimentally before use.
 # 
-#  If GYRO_SCALE_UNKNOWN is set to True then the robot will turn 10 times to make the error more visible. Measure the error
-#  and divide by 10 to get the amount the robot actually turns when instructed to turn 360 degrees. This value can then be
-#  entered for ACTUAL_ROBOT_FULL_TURN, e.g. if the robot is pointing at 45degress to the right from where it started it says
-#  that the robot will turn by 360 + 45/10 = 364.5 degrees when instructed to turn 360 degrees. So we set ACTUAL_ROBOT_FULL_TURN
-#  to 364.5 and then set GYRO_SCALE_UNKNOWN to False to indicate we know what the error is.
+# See the V5GyroExample project for more details 
 #
-#  The two values GYRO_SCALE_FOR_TURNS and GYRO_SCALE_FOR_READOUT are then used in the code as follows:
-#   - GYRO_SCALE_FOR_TURNS is used when we tell the robot to turn. In the example above we want the robot to turn less
-#   - GURO_SCALE_FOR_READOUT is used when we read the inertial sensor to display the current heading. In the example above
-#     the inertial sensor is returning a value that is too small so we need to multiply by a factor > 1 to get the correct value
-#
-# IMPORTANT: If the robot does not turn cleanly meaning TURN_CONSTANT needs adjusting, do that first (see NOTE below). If this is
-#  the case temporarily set GYRO_SCALE_UNKNOWN to False and ACTUAL_ROBOT_FULL_TURN to 360.0 and come back to this later
+# IMPORTANT: Robot must turn cleanly for this calibration to be accurate if doing this here. Make sure at least the TurnPID
+# funcionality is working before setting this and pay attention to any residual error reported by the sensor after a full turn.
 
-ACTUAL_ROBOT_FULL_TURN = 361.0 # (362 for CODE BOT) e.g. if robot actually turns 365 degrees for a 360 rotation enter 365 here
+ACTUAL_ROBOT_FULL_TURN = 361.0 # (~361-362 for CODE BOT) e.g. if robot actually turns 365 degrees for a 360 rotation enter 365 here
 GYRO_SCALE_FOR_TURNS = 360.0 / ACTUAL_ROBOT_FULL_TURN
 GYRO_SCALE_FOR_READOUT = ACTUAL_ROBOT_FULL_TURN / 360.0
-
-# NOTE: TIME_FOR_FULL_TURN is how fast the robot can complete one full revolution. It is used to calculate a timeout value to stop
-#  the robot in case turn command does not complete, e.g. if blocked against something
-TIME_FOR_FULL_TURN = 2.0 # seconds. Set to 2 seconds by default - adjust accordingly based on your robot and turn_velocity() setting
 
 # NOTE: Use ROBOT_INITIALIZED to allow movement. Calibration time is hidden when connected to field, but we need to prevent robot
 #  from moving if we just do Program->Run on the controller
