@@ -146,12 +146,13 @@ class SimplePID:
         self.prev_output = 0.0
 
         # Time parameters
-        self.settle_timer_limit = 0.1 # default settle time in seconds
+        self.settle_timer_limit = 0.1 # default settle time in seconds, set to 0.0 to disable settling
         self.settle_error_threshold = 1.0 # unit agnostic settle threshold
-        self.timeout_timer_limit = 10.0 # default timeout in seconds
+        self.timeout_timer_limit = 10.0 # default timeout in seconds, set to 0.0 to disable timeout
         self.timestep = 0.01 # approximate timestep in seconds - used to process timeouts. Changing this will scale the K values
 
         # Timers
+        # For free running PID such as heading lock disable these by setting time limits above to 0.0
         self.settle_timer = self.settle_timer_limit
         self.timeout_timer = self.timeout_timer_limit
 
@@ -242,9 +243,11 @@ class SimplePID:
         error = setpoint - measurement
 
         # Integral windup control
-        # Case 1: only accumulate integral if error is less than saturation limit
+        # Case 1: only accumulate integral if error is less than saturation limit. We reset to zero to allow for changing setpoints
         if abs(error) < self.integral_limit:
             self.integral += error
+        else:
+            self.integral = 0.0
         # Case 2: reset integral if error crosses zero
         if (error > 0.0 and self.prev_error < 0.0) or (error < 0.0 and self.prev_error > 0.0):
             self.integral = 0.0
@@ -282,17 +285,19 @@ class SimplePID:
     
     # Timeout and settle check function
     def is_done(self):
-        if self.settle_timer <= 0.0:
+        if self.settle_timer_limit > 0.0 and self.settle_timer <= 0.0:
             self.is_settled = True
             return True
         
-        if self.timeout_timer <= 0.0:
+        if self.timeout_timer_limit > 0.0 and self.timeout_timer <= 0.0:
             self.is_timed_out = True
             return True
         
         return False
     
 class SimpleDrive:
+
+    MAX_VOLTAGE = 11.5
 
     class PIDParameters:
         def __init__(self):
@@ -313,9 +318,11 @@ class SimpleDrive:
         self.stop_mode = BrakeType.COAST
 
     def set_drive_velocity(self, velocity, unit):
+        # will control output limit
         pass
 
     def set_drive_acceleration(self, acceleration, unit):
+        # will control ramp limit
         pass
 
     def set_turn_acceleration(self, acceleration, unit):
@@ -341,6 +348,10 @@ class SimpleDrive:
     def set_stopping(self, mode):
         self.stop_mode = mode
 
+    def turn_to_heading(self, heading):
+        angle = GyroHelper.calc_angle_to_heading(heading)
+        self.turn_for(RIGHT, angle, DEGREES)
+
     def turn_for(self, direction, angle, unit):
         turn_pid = SimplePID(self.turn_pid_constants.Kp, self.turn_pid_constants.Ki, self.turn_pid_constants.Kd)
         turn_pid.set_output_limit(self.turn_pid_constants.max_output) # limit output to 50% power
@@ -351,9 +362,9 @@ class SimpleDrive:
             current_rotation = GyroHelper.gyro_rotation()
             pid_output = turn_pid.compute(target_rotation, current_rotation)
 
-            drive_voltage = pid_output * 11.5 # scale to voltage
-            if (drive_voltage > 12.0): drive_voltage = 12.0
-            if (drive_voltage < -12.0): drive_voltage = -12.0
+            drive_voltage = pid_output * SimpleDrive.MAX_VOLTAGE # scale to voltage
+            if (drive_voltage > SimpleDrive.MAX_VOLTAGE): drive_voltage = SimpleDrive.MAX_VOLTAGE
+            if (drive_voltage < -SimpleDrive.MAX_VOLTAGE): drive_voltage = -SimpleDrive.MAX_VOLTAGE
 
             self.left_motors.spin(FORWARD, drive_voltage, VOLT)
             self.right_motors.spin(FORWARD, -drive_voltage, VOLT)
@@ -363,8 +374,10 @@ class SimpleDrive:
         print("Done Turn: ", turn_pid.get_is_settled(), turn_pid.get_is_timed_out())
 
     def stop(self, mode):
-        self.left_motors.stop(mode)
-        self.right_motors.stop(mode)
+        # Note that setting mode to None will keep motors at their last commanded output
+        if (mode is not None):
+            self.left_motors.stop(mode)
+            self.right_motors.stop(mode)
         
 def autonomous():
     # wait for initialization to complete
